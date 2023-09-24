@@ -1,0 +1,16 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "idf.flashType": "UART",
+  "idf.adapterTargetName": "esp32",
+  "idf.openOcdConfigs": [
+    "board/esp32-wrover-kit-3.3v.cfg"
+  ],
+  "idf.port": "/dev/ttyUSB0",
+  "files.associations": {
+    "esp_log.h": "c",
+    "string.h": "c",
+    "freertos.h": "c",
+    "task.h": "c",
+    "esp_event.h": "c"
+  }
+}
