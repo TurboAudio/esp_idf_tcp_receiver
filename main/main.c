@@ -156,8 +156,9 @@ void wifi_init_sta(void)
 }
 
 // static portMUX_TYPE spin_lock = portMUX_INITIALIZER_UNLOCKED;
-static const int producer_cpu = 1;
+static const int producer_cpu = 0;
 static const int consumer_cpu = 1;
+static QueueHandle_t message_queue;
 void app_main(void)
 {
     //Initialize NVS
@@ -170,13 +171,14 @@ void app_main(void)
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
     wifi_init_sta();
-
     /* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
      * Read "Establishing Wi-Fi or Ethernet Connection" section in
      * examples/protocols/README.md for more information about this function.
      */
     ESP_ERROR_CHECK(example_connect());
 
-    xTaskCreatePinnedToCore(tcp_server_task, "tcp_server", 4096 *3, (void*)AF_INET, 5, NULL, producer_cpu);
-    xTaskCreatePinnedToCore(ledstrip_task, "ledstrip", 4096 *3, (void*)0, 5, NULL, consumer_cpu);
+    const int queue_size = 600;
+    message_queue = xQueueCreate(queue_size, sizeof(uint8_t) * 3);
+    xTaskCreatePinnedToCore(tcp_server_task, "tcp_server", 4096 *3, (void*)&message_queue, 5, NULL, producer_cpu);
+    xTaskCreatePinnedToCore(ledstrip_task, "ledstrip", 4096 *3, (void*)&message_queue, 5, NULL, consumer_cpu);
 }

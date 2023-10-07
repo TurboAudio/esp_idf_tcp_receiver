@@ -40,24 +40,24 @@ led_strip_handle_t configure_led(void)
 
 void ledstrip_task(void *pvParameters)
 {
+    QueueHandle_t* queue_handle = (QueueHandle_t*) pvParameters;
     led_strip_handle_t led_strip = configure_led();
-    bool led_on_off = false;
 
     ESP_LOGI(TAG, "Start blinking LED strip");
-    while (1) {
-        if (led_on_off) {
-            /* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */
-            for (int i = 0; i < LED_STRIP_LED_NUMBERS; i++) {
-                ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, i, 50, 50, 5));
-            }
-            /* Refresh the strip to send data */
-            ESP_ERROR_CHECK(led_strip_refresh(led_strip));
-        } else {
-            /* Set all LED off to clear all pixels */
-            ESP_ERROR_CHECK(led_strip_clear(led_strip));
+    uint8_t buffer[3];
+    size_t current_pixel = 0;
+    while (true) {
+        if (!xQueueReceive(*queue_handle, &buffer, 5)) {
+            continue;
         }
 
-        led_on_off = !led_on_off;
-        vTaskDelay(pdMS_TO_TICKS(500));
+        const uint8_t r = buffer[0];
+        const uint8_t g = buffer[1];
+        const uint8_t b = buffer[2];
+        ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, current_pixel++, r, g, b));
+        if (current_pixel == LED_STRIP_LED_NUMBERS) {
+            current_pixel = 0;
+            ESP_ERROR_CHECK(led_strip_refresh(led_strip));
+        }
     }
 }

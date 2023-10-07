@@ -138,9 +138,11 @@ static inline esp_err_t example_connect(void) {return ESP_OK;}
 }
 #endif
 
-static void process_data(const int sock)
+static void process_data(const int sock, QueueHandle_t* queue_handle)
 {
     char rx_buffer[3000];
+    uint8_t tx_buffer[3];
+    uint8_t tx_index = 0;
     while (true) {
         int len = recv(sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
         if (len < 0) {
@@ -150,15 +152,24 @@ static void process_data(const int sock)
             ESP_LOGW(TAG_SERVER, "Connection closed");
             return;
         } else {
-            ESP_LOGI(TAG_SERVER, "Received %u bytes\n", len);
+            for (int i = 0; i < len; ++i) {
+                tx_buffer[tx_index] = rx_buffer[i];
+                ++tx_index;
+                if (tx_index == 3) {
+                    // Send
+                    while (!xQueueSend(*queue_handle, (void*)&tx_buffer, 5));
+                    tx_index = 0;
+                }
+            }
         }
     }
 }
 
 static void tcp_server_task(void *pvParameters)
 {
+    QueueHandle_t* queue_handle = (QueueHandle_t*) pvParameters;
     char addr_str[128];
-    int addr_family = (int)pvParameters;
+    int addr_family = AF_INET;
     int ip_protocol = 0;
     int keepAlive = 1;
     int keepIdle = KEEPALIVE_IDLE;
@@ -224,7 +235,7 @@ static void tcp_server_task(void *pvParameters)
 
         ESP_LOGI(TAG_SERVER, "Socket accepted ip address: %s", addr_str);
 
-        process_data(sock);
+        process_data(sock, queue_handle);
 
         shutdown(sock, 0);
         close(sock);
