@@ -174,8 +174,6 @@ void app_main(void)
 
     xTaskCreate(tcp_server_task, "tcp_server", 4096 *3, (void*)AF_INET, 5, NULL);
 
-
-
     led_strip_handle_t led_strip = configure_led();
     bool led_on_off = false;
 
