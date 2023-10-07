@@ -1,4 +1,10 @@
 #include <stdio.h>
+#include "esp_eth_driver.h"
+#include "esp_netif.h"
+#include "esp_netif_defaults.h"
+#include "esp_eth.h"
+
+#include "esp_netif_ip_addr.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/task.h"
@@ -21,6 +27,7 @@
 #include "ledstrip_manager.h"
 #include "portmacro.h"
 #include "tcp_server.h"
+#include "ethernet_init.h"
 
 #define EXAMPLE_ESP_WIFI_SSID      "Suziass\0\0\0"
 #define EXAMPLE_ESP_WIFI_PASS      "Assuzie789\0\0"
@@ -92,9 +99,6 @@ void wifi_init_sta(void)
 {
     s_wifi_event_group = xEventGroupCreate();
 
-    ESP_ERROR_CHECK(esp_netif_init());
-
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -155,7 +159,54 @@ void wifi_init_sta(void)
     }
 }
 
-// static portMUX_TYPE spin_lock = portMUX_INITIALIZER_UNLOCKED;
+
+void eth_event_handler_pipi(void* args, esp_event_base_t even_base, int32_t event_id, void* event_data) {
+    ip_event_got_ip_t* event = (ip_event_got_ip_t*)event_data;
+    const esp_netif_ip_info_t* ip_info = &event->ip_info;
+    ESP_LOGI("ETHERNET", "IP: " IPSTR, IP2STR(&ip_info->ip));
+    ESP_LOGI("ETHERNET", "NETMASK: " IPSTR, IP2STR(&ip_info->netmask));
+    ESP_LOGI("ETHERNET", "GW: " IPSTR, IP2STR(&ip_info->gw));
+}
+
+int init_eth() {
+    esp_err_t err;
+    uint8_t eth_port_count;
+    esp_eth_handle_t* eth_handles;
+    err = ethernet_init_all(&eth_handles, &eth_port_count);
+    if (err != ESP_OK) {
+        ESP_LOGI("ETH INIT", "Ethernet initi all failed");
+        return err;
+    }
+
+    if (eth_port_count != 1) {
+        ESP_LOGI("ETH INIT", "Ethernet count %u but expected 1", eth_port_count);
+        return ESP_FAIL;
+    }
+
+    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_ETH();
+    esp_netif_t* netif = esp_netif_new(&cfg);
+    err = esp_netif_attach(netif, esp_eth_new_netif_glue(eth_handles[0]));
+    if (err != ESP_OK) {
+        ESP_LOGI("ETH INIT", "Attach glue failed");
+        return err;
+    }
+
+    err = esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &eth_event_handler_pipi, NULL);
+    if (err != ESP_OK) {
+        ESP_LOGI("ETH INIT", "Failed to attach event handler.");
+        return err;
+    }
+
+    err = esp_eth_start(eth_handles[0]);
+    if (err != ESP_OK) {
+        ESP_LOGI("ETH INIT", "Failed to start eth handle");
+        return err;
+    }
+
+    return ESP_OK;
+}
+
+
 static const int producer_cpu = 0;
 static const int consumer_cpu = 1;
 static QueueHandle_t message_queue;
@@ -169,13 +220,12 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-    wifi_init_sta();
-    /* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
-     * Read "Establishing Wi-Fi or Ethernet Connection" section in
-     * examples/protocols/README.md for more information about this function.
-     */
-    ESP_ERROR_CHECK(example_connect());
+    if (init_eth() != ESP_OK) {
+        wifi_init_sta();
+    }
 
     const int queue_size = 600;
     message_queue = xQueueCreate(queue_size, sizeof(uint8_t) * 3);
