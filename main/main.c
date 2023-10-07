@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/task.h"
 #include "led_strip.h"
 #include "esp_log.h"
@@ -18,6 +19,7 @@
 #include "lwip/sys.h"
 
 #include "ledstrip_manager.h"
+#include "portmacro.h"
 #include "tcp_server.h"
 
 #define EXAMPLE_ESP_WIFI_SSID      "Suziass\0\0\0"
@@ -153,6 +155,9 @@ void wifi_init_sta(void)
     }
 }
 
+// static portMUX_TYPE spin_lock = portMUX_INITIALIZER_UNLOCKED;
+static const int producer_cpu = 1;
+static const int consumer_cpu = 1;
 void app_main(void)
 {
     //Initialize NVS
@@ -172,27 +177,6 @@ void app_main(void)
      */
     ESP_ERROR_CHECK(example_connect());
 
-    xTaskCreate(tcp_server_task, "tcp_server", 4096 *3, (void*)AF_INET, 5, NULL);
-
-    led_strip_handle_t led_strip = configure_led();
-    bool led_on_off = false;
-
-    ESP_LOGI(TAG, "Start blinking LED strip");
-    while (1) {
-        if (led_on_off) {
-            /* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */
-            for (int i = 0; i < LED_STRIP_LED_NUMBERS; i++) {
-                ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, i, 50, 50, 5));
-            }
-            /* Refresh the strip to send data */
-            ESP_ERROR_CHECK(led_strip_refresh(led_strip));
-        } else {
-            /* Set all LED off to clear all pixels */
-            ESP_ERROR_CHECK(led_strip_clear(led_strip));
-        }
-
-        led_on_off = !led_on_off;
-        vTaskDelay(pdMS_TO_TICKS(500));
-    }
-
+    xTaskCreatePinnedToCore(tcp_server_task, "tcp_server", 4096 *3, (void*)AF_INET, 5, NULL, producer_cpu);
+    xTaskCreatePinnedToCore(ledstrip_task, "ledstrip", 4096 *3, (void*)0, 5, NULL, consumer_cpu);
 }

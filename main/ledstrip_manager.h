@@ -8,6 +8,7 @@
 // GPIO assignment
 static const char* TAG = "turbo_ledstrip";
 #define LED_STRIP_BLINK_GPIO  17
+// #define LED_STRIP_BLINK_GPIO  4
 // Numbers of the LED in the strip
 #define LED_STRIP_LED_NUMBERS 300
 // 10MHz resolution, 1 tick = 0.1us (led strip needs a high resolution)
@@ -35,4 +36,28 @@ led_strip_handle_t configure_led(void)
     ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
     ESP_LOGI(TAG, "Created LED strip object with RMT backend");
     return led_strip;
+}
+
+void ledstrip_task(void *pvParameters)
+{
+    led_strip_handle_t led_strip = configure_led();
+    bool led_on_off = false;
+
+    ESP_LOGI(TAG, "Start blinking LED strip");
+    while (1) {
+        if (led_on_off) {
+            /* Set the LED pixel using RGB from 0 (0%) to 255 (100%) for each color */
+            for (int i = 0; i < LED_STRIP_LED_NUMBERS; i++) {
+                ESP_ERROR_CHECK(led_strip_set_pixel(led_strip, i, 50, 50, 5));
+            }
+            /* Refresh the strip to send data */
+            ESP_ERROR_CHECK(led_strip_refresh(led_strip));
+        } else {
+            /* Set all LED off to clear all pixels */
+            ESP_ERROR_CHECK(led_strip_clear(led_strip));
+        }
+
+        led_on_off = !led_on_off;
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
 }
