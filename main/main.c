@@ -10,9 +10,8 @@
 #include "tcp_server.h"
 #include "ethernet_init.h"
 
-#define EXAMPLE_ESP_WIFI_SSID      "Suziass\0\0\0"
-#define EXAMPLE_ESP_WIFI_PASS      "Assuzie789\0\0"
-#define EXAMPLE_ESP_MAXIMUM_RETRY  5
+static const char EXAMPLE_ESP_WIFI_SSID[] = "Suziass\0\0\0";
+static const char EXAMPLE_ESP_WIFI_PASS[] = "Assuzie789\0\0";
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
@@ -20,8 +19,8 @@ static EventGroupHandle_t s_wifi_event_group;
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
  * - we failed to connect after the maximum amount of retries */
-#define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT      BIT1
+static const EventBits_t WIFI_CONNECTED_BIT = BIT0;
+static const EventBits_t WIFI_FAIL_BIT = BIT1;
 
 static int s_retry_num = 0;
 
@@ -29,10 +28,11 @@ static int s_retry_num = 0;
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
 {
+    static const int max_connection_attempt = 5;
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < EXAMPLE_ESP_MAXIMUM_RETRY) {
+        if (s_retry_num < max_connection_attempt) {
             esp_wifi_connect();
             s_retry_num++;
             ESP_LOGI(TAG, "retry to connect to the AP");
@@ -72,8 +72,8 @@ void wifi_init_sta(void)
 
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = EXAMPLE_ESP_WIFI_SSID,
-            .password = EXAMPLE_ESP_WIFI_PASS,
+            .ssid = "",
+            .password = "",
             /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
              * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
              * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
@@ -84,6 +84,8 @@ void wifi_init_sta(void)
             .sae_h2e_identifier = "\0",
         },
     };
+    memcpy(wifi_config.sta.ssid, EXAMPLE_ESP_WIFI_SSID, sizeof(EXAMPLE_ESP_WIFI_SSID));
+    memcpy(wifi_config.sta.password, EXAMPLE_ESP_WIFI_PASS, sizeof(EXAMPLE_ESP_WIFI_PASS));
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
