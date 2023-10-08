@@ -1,40 +1,9 @@
-#include <string.h>
-#include <sys/param.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_system.h"
-#include "esp_wifi.h"
-#include "esp_event.h"
 #include "esp_log.h"
-#include "nvs_flash.h"
-#include "esp_netif.h"
-
 #include "lwip/err.h"
 #include "lwip/sockets.h"
-#include "lwip/sys.h"
-#include <lwip/netdb.h>
 
-
-#define PORT                        1234
-#define KEEPALIVE_IDLE              1000
-#define KEEPALIVE_INTERVAL          1000
-#define KEEPALIVE_COUNT             3
 
 static const char *TAG_SERVER = "tcp_server";
-/* Common functions for protocol examples, to establish Wi-Fi or Ethernet connection.
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
- */
-
-#pragma once
-
-#include "sdkconfig.h"
-#include "esp_err.h"
-#include "esp_netif.h"
 
 static void process_data(const int sock, QueueHandle_t* queue_handle)
 {
@@ -63,23 +32,25 @@ static void process_data(const int sock, QueueHandle_t* queue_handle)
     }
 }
 
+
 static void tcp_server_task(void *pvParameters)
 {
+    static const uint32_t port = 1234;
     QueueHandle_t* queue_handle = (QueueHandle_t*) pvParameters;
     char addr_str[128];
     int addr_family = AF_INET;
     int ip_protocol = 0;
     int keepAlive = 1;
-    int keepIdle = KEEPALIVE_IDLE;
-    int keepInterval = KEEPALIVE_INTERVAL;
-    int keepCount = KEEPALIVE_COUNT;
+    int keepIdle = 1000;
+    int keepInterval = 1000;
+    int keepCount = 3;
     struct sockaddr_storage dest_addr;
 
     if (addr_family == AF_INET) {
         struct sockaddr_in *dest_addr_ip4 = (struct sockaddr_in *)&dest_addr;
         dest_addr_ip4->sin_addr.s_addr = htonl(INADDR_ANY);
         dest_addr_ip4->sin_family = AF_INET;
-        dest_addr_ip4->sin_port = htons(PORT);
+        dest_addr_ip4->sin_port = htons(port);
         ip_protocol = IPPROTO_IP;
     }
 
@@ -100,7 +71,7 @@ static void tcp_server_task(void *pvParameters)
         ESP_LOGE(TAG_SERVER, "IPPROTO: %d", addr_family);
         goto CLEAN_UP;
     }
-    ESP_LOGI(TAG_SERVER, "Socket bound, port %d", PORT);
+    ESP_LOGI(TAG_SERVER, "Socket bound, port %" PRIu32, port);
 
     err = listen(listen_sock, 1);
     if (err != 0) {
