@@ -2,9 +2,7 @@
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 
-
 static const char *TAG_SERVER = "tcp_server";
-
 static void process_data(const int sock, QueueHandle_t* queue_handle)
 {
     char rx_buffer[3000];
@@ -23,7 +21,6 @@ static void process_data(const int sock, QueueHandle_t* queue_handle)
                 tx_buffer[tx_index] = rx_buffer[i];
                 ++tx_index;
                 if (tx_index == 3) {
-                    // Send
                     while (!xQueueSend(*queue_handle, (void*)&tx_buffer, 5));
                     tx_index = 0;
                 }
