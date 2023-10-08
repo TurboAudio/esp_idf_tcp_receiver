@@ -25,8 +25,7 @@ static const EventBits_t WIFI_FAIL_BIT = BIT1;
 static int s_retry_num = 0;
 
 
-static void event_handler(void* arg, esp_event_base_t event_base,
-                                int32_t event_id, void* event_data)
+static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     static const int max_connection_attempt = 5;
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
@@ -48,27 +47,39 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-void wifi_init_sta(void)
+esp_err_t wifi_init_sta(void)
 {
     s_wifi_event_group = xEventGroupCreate();
 
     esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    esp_wifi_set_ps(WIFI_PS_NONE);
+    esp_err_t err;
+    err = esp_wifi_init(&cfg);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize wifi.");
+        return err;
+    }
+
+    err = esp_wifi_set_ps(WIFI_PS_NONE);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set wifi power saving mode.");
+        return err;
+    }
+
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
-                                                        ESP_EVENT_ANY_ID,
-                                                        &event_handler,
-                                                        NULL,
-                                                        &instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
-                                                        IP_EVENT_STA_GOT_IP,
-                                                        &event_handler,
-                                                        NULL,
-                                                        &instance_got_ip));
+    err = esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, &instance_any_id);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure wifi event handler instance register for any ids.");
+        return err;
+    }
+
+    err = esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL, &instance_got_ip);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure wifi event handler for GOT_IP.");
+        return err;
+    }
 
     wifi_config_t wifi_config = {
         .sta = {
@@ -87,9 +98,23 @@ void wifi_init_sta(void)
     memcpy(wifi_config.sta.ssid, EXAMPLE_ESP_WIFI_SSID, sizeof(EXAMPLE_ESP_WIFI_SSID));
     memcpy(wifi_config.sta.password, EXAMPLE_ESP_WIFI_PASS, sizeof(EXAMPLE_ESP_WIFI_PASS));
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
-    ESP_ERROR_CHECK(esp_wifi_start() );
+    err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set wifi mode.");
+        return err;
+    }
+
+    err = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set wifi config.");
+        return err;
+    }
+
+    err = esp_wifi_start();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start wifi.");
+        return err;
+    }
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 
@@ -112,6 +137,8 @@ void wifi_init_sta(void)
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
+
+    return ESP_OK;
 }
 
 
@@ -179,7 +206,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
     if (init_eth() != ESP_OK) {
-        wifi_init_sta();
+        ESP_ERROR_CHECK(wifi_init_sta());
     }
 
     const int queue_size = 600;
