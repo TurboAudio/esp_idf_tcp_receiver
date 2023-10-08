@@ -1,19 +1,9 @@
-#include <stdio.h>
-#include "esp_eth_driver.h"
-#include "esp_netif.h"
-#include "esp_netif_defaults.h"
-#include "esp_eth.h"
-
 #include "freertos/FreeRTOS.h"
-#include "freertos/idf_additions.h"
 #include "freertos/task.h"
-#include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "nvs_flash.h"
-
-#include "lwip/err.h"
-#include "lwip/sys.h"
+#include "esp_eth.h"
 
 #include "ledstrip_manager.h"
 #include "portmacro.h"
